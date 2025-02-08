@@ -5,37 +5,96 @@
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div id="control-panel">
-        <h1>Control Panel</h1>
-        <button id="left-click">Left Click</button>
-        <button id="right-click">Right Click</button>
+    <div id="login-form" style="display: none;">
+        <h1>Enter Code Word</h1>
+        <form method="post" action="/login?next=control">
+            <input type="text" name="code_word" placeholder="Code Word" required>
+            <button type="submit">Submit</button>
+        </form>
     </div>
-    <div id="touch-area"></div>
-    <input type="range" id="scroll" min="-100" max="100" value="0">
+    <div id="control-panel" style="display: none;">
+        <h1>Control Panel</h1>
+        <div id="control-area">
+            <button id="left-click">L</button>
+            <div id="scroll"></div>
+            <button id="right-click">R</button>
+        </div>
+        <div id="touch-area"></div>
+        <div>
+            <label for="cursor-sensitivity">Cursor Sensitivity:</label>
+            <input type="range" id="cursor-sensitivity" min="0.1" max="5" step="0.1" value="1.0">
+        </div>
+        <div>
+            <label for="scroll-sensitivity">Scroll Sensitivity:</label>
+            <input type="range" id="scroll-sensitivity" min="0.1" max="5" step="0.1" value="1.0">
+        </div>
+    </div>
     <script>
+        document.body.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+
         const touchArea = document.getElementById('touch-area');
-        let startX, startY;
+        const scroll = document.getElementById('scroll');
+        let startX, startY, scrollInterval;
+        let cursorSensitivity = 1.0;  // Инициализация переменной чувствительности курсора
+        let scrollSensitivity = 1.0;  // Инициализация переменной чувствительности прокрутки
+        let lastMoveTime = 0;
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        }
+
+        const codeWord = getCookie('code_word');
+        if (codeWord) {
+            fetch('/verify_code_word', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ code_word: codeWord })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('login-form').style.display = 'none';
+                    document.getElementById('control-panel').style.display = 'block';
+                } else {
+                    document.getElementById('login-form').style.display = 'block';
+                }
+            });
+        } else {
+            document.getElementById('login-form').style.display = 'block';
+        }
 
         touchArea.addEventListener('touchstart', (e) => {
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
         });
 
-        touchArea.addEventListener('touchend', (e) => {
-            const endX = e.changedTouches[0].clientX;
-            const endY = e.changedTouches[0].clientY;
-            fetch('/command', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    code_word: 'secret',
-                    action: 'move',
-                    x: endX - startX,
-                    y: endY - startY
-                })
-            });
+        touchArea.addEventListener('touchmove', (e) => {
+            const currentX = e.touches[0].clientX;
+            const currentY = e.touches[0].clientY;
+            const currentTime = Date.now();
+            if (currentTime - lastMoveTime >= 300) {
+                fetch('/command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code_word: codeWord,
+                        action: 'move',
+                        x: (currentX - startX) * cursorSensitivity,
+                        y: (currentY - startY) * cursorSensitivity
+                    })
+                });
+                lastMoveTime = currentTime;
+                startX = currentX;
+                startY = currentY;
+            }
         });
 
         document.getElementById('left-click').addEventListener('click', () => {
@@ -45,7 +104,7 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    code_word: 'secret',
+                    code_word: codeWord,
                     action: 'left_click'
                 })
             });
@@ -58,23 +117,85 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    code_word: 'secret',
+                    code_word: codeWord,
                     action: 'right_click'
                 })
             });
         });
 
-        document.getElementById('scroll').addEventListener('input', (e) => {
-            fetch('/command', {
+        scroll.addEventListener('mousedown', (e) => {
+            const scrollRect = scroll.getBoundingClientRect();
+            const scrollY = e.clientY - scrollRect.top;
+
+            scrollInterval = setInterval(() => {
+                fetch('/command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code_word: codeWord,
+                        action: 'scroll',
+                        value: (scrollY < scrollRect.height / 2 ? -10 : 10) * scrollSensitivity
+                    })
+                });
+            }, 100);
+        });
+
+        scroll.addEventListener('mouseup', () => {
+            clearInterval(scrollInterval);
+        });
+
+        scroll.addEventListener('mouseleave', () => {
+            clearInterval(scrollInterval);
+        });
+
+        scroll.addEventListener('touchstart', (e) => {
+            const scrollRect = scroll.getBoundingClientRect();
+            const scrollY = e.touches[0].clientY - scrollRect.top;
+
+            scrollInterval = setInterval(() => {
+                fetch('/command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code_word: codeWord,
+                        action: 'scroll',
+                        value: (scrollY < scrollRect.height / 2 ? -10 : 10) * scrollSensitivity
+                    })
+                });
+            }, 100);
+        });
+
+        scroll.addEventListener('touchend', () => {
+            clearInterval(scrollInterval);
+        });
+
+        scroll.addEventListener('touchcancel', () => {
+            clearInterval(scrollInterval);
+        });
+
+        document.getElementById('cursor-sensitivity').addEventListener('input', (e) => {
+            cursorSensitivity = parseFloat(e.target.value);
+            fetch('/update_sensitivity', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    code_word: 'secret',
-                    action: 'scroll',
-                    value: parseInt(e.target.value)
-                })
+                body: JSON.stringify({ cursor_sensitivity: cursorSensitivity, scroll_sensitivity: scrollSensitivity })
+            });
+        });
+
+        document.getElementById('scroll-sensitivity').addEventListener('input', (e) => {
+            scrollSensitivity = parseFloat(e.target.value);
+            fetch('/update_sensitivity', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ cursor_sensitivity: cursorSensitivity, scroll_sensitivity: scrollSensitivity })
             });
         });
     </script>

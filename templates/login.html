@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+</head>
+<body>
+    <h1>Login</h1>
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+    <form method="post" action="/login?next=control">
+        <input type="text" name="code_word" placeholder="Code Word" required>
+        <button type="submit">Login</button>
+    </form>
+</body>
+</html>
