@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Control Panel</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div id="control-panel">
+        <h1>Control Panel</h1>
+        <button id="left-click">Left Click</button>
+        <button id="right-click">Right Click</button>
+    </div>
+    <div id="touch-area"></div>
+    <input type="range" id="scroll" min="-100" max="100" value="0">
+    <script>
+        const touchArea = document.getElementById('touch-area');
+        let startX, startY;
+
+        touchArea.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        });
+
+        touchArea.addEventListener('touchend', (e) => {
+            const endX = e.changedTouches[0].clientX;
+            const endY = e.changedTouches[0].clientY;
+            fetch('/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    code_word: 'secret',
+                    action: 'move',
+                    x: endX - startX,
+                    y: endY - startY
+                })
+            });
+        });
+
+        document.getElementById('left-click').addEventListener('click', () => {
+            fetch('/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    code_word: 'secret',
+                    action: 'left_click'
+                })
+            });
+        });
+
+        document.getElementById('right-click').addEventListener('click', () => {
+            fetch('/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    code_word: 'secret',
+                    action: 'right_click'
+                })
+            });
+        });
+
+        document.getElementById('scroll').addEventListener('input', (e) => {
+            fetch('/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    code_word: 'secret',
+                    action: 'scroll',
+                    value: parseInt(e.target.value)
+                })
+            });
+        });
+    </script>
+</body>
+</html>
