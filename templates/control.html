@@ -78,7 +78,7 @@
             const currentX = e.touches[0].clientX;
             const currentY = e.touches[0].clientY;
             const currentTime = Date.now();
-            if (currentTime - lastMoveTime >= 300) {
+            if (currentTime - lastMoveTime >= 300) {  // Задержка 300 мс
                 fetch('/command', {
                     method: 'POST',
                     headers: {
