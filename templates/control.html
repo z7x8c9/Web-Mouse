@@ -14,6 +14,9 @@
     </div>
     <div id="control-panel" style="display: none;">
         <h1>Control Panel</h1>
+        <div id="screen-container">
+            <canvas id="screen-canvas" width="830" height="450"></canvas>
+        </div>
         <div id="control-area">
             <button id="left-click">L</button>
             <div id="scroll"></div>
@@ -61,12 +64,30 @@
                 if (data.status === 'success') {
                     document.getElementById('login-form').style.display = 'none';
                     document.getElementById('control-panel').style.display = 'block';
+                    updateScreen();
                 } else {
                     document.getElementById('login-form').style.display = 'block';
                 }
             });
         } else {
             document.getElementById('login-form').style.display = 'block';
+        }
+
+        function updateScreen() {
+            fetch('/screenshot')
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.getElementById('screen-canvas');
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        URL.revokeObjectURL(url);
+                    };
+                    img.src = url;
+                });
+            setTimeout(updateScreen, 300);
         }
 
         touchArea.addEventListener('touchstart', (e) => {
@@ -78,7 +99,7 @@
             const currentX = e.touches[0].clientX;
             const currentY = e.touches[0].clientY;
             const currentTime = Date.now();
-            if (currentTime - lastMoveTime >= 300) {  // Задержка 300 мс
+            if (currentTime - lastMoveTime >= 300) {
                 fetch('/command', {
                     method: 'POST',
                     headers: {

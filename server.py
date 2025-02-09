@@ -2,12 +2,17 @@ from flask import Flask, render_template, request, jsonify, send_file, url_for, 
 import pyautogui
 import qrcode
 import io
-from PIL import Image
+from PIL import Image, ImageDraw
 import json
 import os
+import mss
+import logging
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key_here'  
+app.secret_key = 'NONE' 
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def get_code_word():
     with open('code.json', 'r') as file:
@@ -83,5 +88,24 @@ def update_code_word():
     set_code_word(new_code_word)
     return jsonify({'status': 'success', 'message': 'Code word updated'})
 
+@app.route('/screenshot')
+def screenshot():
+    with mss.mss() as sct:
+        monitor = sct.monitors[1]
+        sct_img = sct.grab(monitor)
+        img = Image.frombytes('RGB', sct_img.size, sct_img.rgb)
+        
+        cursor_x, cursor_y = pyautogui.position()
+        draw = ImageDraw.Draw(img)
+        cursor_size = 10
+        draw.ellipse((cursor_x - cursor_size, cursor_y - cursor_size, cursor_x + cursor_size, cursor_y + cursor_size), outline="red", width=2)
+        
+        img_io = io.BytesIO()
+        img.save(img_io, 'PNG')
+        img_io.seek(0)
+        return send_file(img_io, mimetype='image/png')
+
 if __name__ == '__main__':
+    if not os.path.exists('code.json'):
+        set_code_word('NONE')
     app.run(host='0.0.0.0', port=5000)

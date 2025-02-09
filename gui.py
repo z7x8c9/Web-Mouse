@@ -70,22 +70,18 @@ class App:
         messagebox.showinfo("Info", "Code word updated successfully")
 
     def generate_qr_code(self):
-        url = "http://192.168.0.101:5000/control"
+        url = "http://192.168.0.100:5000/control"
         qr = qrcode.make(url)
-        qr_img = qr.resize((310, 310))  # Устанавливаем размер QR-кода
+        qr_img = qr.resize((310, 310))
         qr_img_tk = ImageTk.PhotoImage(qr_img)
         self.qr_label.config(image=qr_img_tk)
         self.qr_label.image = qr_img_tk
 
     def start_server(self):
-        code_word = self.code_word_var.get()
-        if not code_word:
-            messagebox.showwarning("Warning", "Please enter a code word!")
-            return
-
-        self.server_process = subprocess.Popen(["python", "server.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        
-        threading.Thread(target=self.read_logs).start()
+        if not self.server_process:
+            self.server_process = subprocess.Popen(["python", "server.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            threading.Thread(target=self.read_logs, daemon=True).start()
+            threading.Thread(target=self.read_error_logs, daemon=True).start()
     
     def stop_server(self):
         if self.server_process:
@@ -93,13 +89,29 @@ class App:
             self.server_process = None
     
     def read_logs(self):
-        while True:
-            if not self.server_process:
-                break
-            line = self.server_process.stdout.readline()
-            if not line:
-                break
-            self.log_text.insert(tk.END, line.decode())
+        try:
+            while True:
+                if not self.server_process:
+                    break
+                output = self.server_process.stdout.readline()
+                if output:
+                    self.log_text.insert(tk.END, output)
+                    self.log_text.yview(tk.END)
+        except Exception as e:
+            self.log_text.insert(tk.END, f"Log read error: {str(e)}\n")
+            self.log_text.yview(tk.END)
+
+    def read_error_logs(self):
+        try:
+            while True:
+                if not self.server_process:
+                    break
+                output = self.server_process.stderr.readline()
+                if output:
+                    self.log_text.insert(tk.END, output, 'error')
+                    self.log_text.yview(tk.END)
+        except Exception as e:
+            self.log_text.insert(tk.END, f"Error log read error: {str(e)}\n")
             self.log_text.yview(tk.END)
 
 root = tk.Tk()
